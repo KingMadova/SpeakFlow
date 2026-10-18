@@ -58,49 +58,19 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
     };
   }, []);
 
-  // When recording stops and we have audio
+  // A recording counts only after MediaRecorder has produced real audio data.
+  // The recorder's onstop event is asynchronous, so the UI waits for audioBlob.
   useEffect(() => {
-    if (audioBlob && !isRecording) {
+    if (audioBlob && audioBlob.size > 0 && !isRecording) {
       setHasRecorded(true);
-      if (onSaveProgress) {
-        onSaveProgress();
-      }
+      onSaveProgress?.();
+    } else if (audioBlob && audioBlob.size === 0 && !isRecording) {
+      setHasRecorded(false);
     }
   }, [audioBlob, isRecording, onSaveProgress]);
 
   const handleStopClick = () => {
     stopRecording();
-    // In headless or environments without physical audio hardware, ensure fallback audio URL
-    if (!audioBlob) {
-      try {
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const dst = ctx.createMediaStreamDestination();
-        osc.connect(dst);
-        osc.start();
-        const rec = new MediaRecorder(dst.stream);
-        const chunks: Blob[] = [];
-        rec.ondataavailable = (e) => chunks.push(e.data);
-        rec.onstop = () => {
-          const b = new Blob(chunks, { type: 'audio/webm' });
-          setHasRecorded(true);
-          if (onSaveProgress) onSaveProgress();
-        };
-        rec.start();
-        setTimeout(() => {
-          rec.stop();
-          osc.stop();
-          ctx.close();
-        }, 100);
-      } catch {
-        setHasRecorded(true);
-        if (onSaveProgress) onSaveProgress();
-      }
-    } else {
-      setHasRecorded(true);
-      if (onSaveProgress) onSaveProgress();
-    }
   };
 
   const handleTogglePlayRecorded = () => {
