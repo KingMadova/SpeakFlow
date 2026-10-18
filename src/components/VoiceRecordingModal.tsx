@@ -44,20 +44,12 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const countedBlobRef = useRef<Blob | null>(null);
 
-  // Automatically start recording when modal opens if not already recorded
+  // Request microphone access only after the user explicitly starts recording.
   useEffect(() => {
-    let mounted = true;
-    startRecording().then((success) => {
-      if (!mounted && success) {
-        cancelRecording();
-      }
-    });
-
     return () => {
-      mounted = false;
       cancelRecording();
     };
-  }, []);
+  }, [cancelRecording]);
 
   // A recording counts only after MediaRecorder has produced real audio data.
   // The recorder's onstop event is asynchronous, so the UI waits for audioBlob.
@@ -170,7 +162,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
 
             <div>
               <p className="text-base font-bold text-[#F5F5F7]">
-                Enregistrement en cours...
+                {isRecording ? 'Enregistrement en cours...' : 'Prêt à vous enregistrer'}
               </p>
               <p className="text-sm font-mono text-[#A4A4AD] mt-1">
                 {formatTimestamp(recordingDuration)}
@@ -216,10 +208,17 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
               Annuler
             </button>
             <button
-              onClick={handleStopClick}
+              onClick={() => {
+                if (isRecording) {
+                  handleStopClick();
+                } else {
+                  startRecording();
+                }
+              }}
               className="flex-1 py-3 px-4 rounded-full bg-[#FF7A18] hover:bg-[#FF8A2E] text-white font-semibold text-sm transition-all shadow-lg shadow-[#FF7A18]/25"
+              disabled={!!audioBlob}
             >
-              Arrêter
+              {isRecording ? 'Arrêter' : 'Commencer'}
             </button>
           </div>
         </div>
