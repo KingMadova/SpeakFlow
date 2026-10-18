@@ -78,6 +78,11 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   const activeSubtitle = scene.subtitles[activeSubtitleIndex] || scene.subtitles[0] || null;
   const activeWord = findActiveWord(activeSubtitle, currentTime);
 
+  useEffect(() => {
+    setVideoError(!scene.videoUrl);
+    setIsPlaying(false);
+  }, [scene.id, scene.videoUrl]);
+
   // Synchronize playback speed
   useEffect(() => {
     if (videoRef.current) {
@@ -153,22 +158,24 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      if (videoRef.current && !videoRef.current.paused) {
-        videoRef.current.pause();
-      }
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      videoRef.current?.pause();
       setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
-      if (videoRef.current) {
-        videoRef.current.play().catch(() => {
-          // If video cannot play, our fallback clock and speech engine runs seamlessly
-        });
-      }
+      return;
     }
-  }, [isPlaying, activeSubtitle]);
+
+    if (!scene.videoUrl || videoError || !videoRef.current) {
+      setVideoError(true);
+      setIsPlaying(false);
+      return;
+    }
+
+    videoRef.current.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      setVideoError(true);
+      setIsPlaying(false);
+    });
+  }, [isPlaying, scene.videoUrl, videoError]);
 
   // Clock loop when isPlaying is true (coordinates time, word highlighting, repeat & advance)
   // The media element is the single source of truth for playback time.
@@ -368,8 +375,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
           {/* Interactive animated fallback if video network is restricted */}
           {videoError && (
             <div
-              onClick={togglePlay}
-              className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-4 text-center cursor-pointer"
+              className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-4 text-center"
             >
               <img
                 src={scene.thumbnailUrl}
@@ -378,17 +384,17 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
               />
               <div className="relative z-10 bg-black/60 backdrop-blur-sm p-3 rounded-xl border border-white/10 max-w-xs">
                 <p className="text-xs font-semibold text-[#FF7A18] mb-1">
-                  Scène d&apos;écoute & shadowing
+                  Vidéo indisponible
                 </p>
                 <p className="text-[11px] text-[#C5C5CE]">
-                  Cliquez pour {isPlaying ? 'mettre en pause' : 'lancer la scène'}
+                  Cette scène ne peut pas être synchronisée tant qu’une vidéo adaptée n’est pas configurée.
                 </p>
               </div>
             </div>
           )}
 
           {/* Play/Pause overlay icon when paused */}
-          {!isPlaying && (
+          {!isPlaying && !videoError && (
             <button
               onClick={togglePlay}
               className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
