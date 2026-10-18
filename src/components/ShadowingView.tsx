@@ -207,6 +207,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   }, [isPlaying, activeSubtitle, speakCurrentSubtitle]);
 
   // Clock loop when isPlaying is true (coordinates time, word highlighting, repeat & advance)
+  // The media element is the single source of truth for playback time.
+  // If the video cannot play, do not simulate progress with a fallback clock.
   useEffect(() => {
     if (!isPlaying) {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -215,84 +217,21 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       return;
     }
 
-    let lastTime = performance.now();
-    let animId: number;
+    if (!videoRef.current || videoError) {
+      setIsPlaying(false);
+      return;
+    }
 
-    const tick = (now: number) => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // Check if video element is actively playing and advancing
-      const videoAdvancing =
-        videoRef.current &&
-        !videoRef.current.paused &&
-        !videoRef.current.ended &&
-        !videoError;
-
-      if (!videoAdvancing) {
-        setCurrentTime((prev) => {
-          const next = prev + dt * settings.playbackSpeed;
-
-          // Check if current phrase has finished
-          if (activeSubtitle) {
-            if (next >= activeSubtitle.endTime) {
-              if (repeatMode === 'phrase') {
-                speakCurrentSubtitle(activeSubtitle);
-                return activeSubtitle.startTime;
-              } else if (repeatMode === 'off') {
-                if (activeSubtitleIndex < scene.subtitles.length - 1) {
-                  const nextSub = scene.subtitles[activeSubtitleIndex + 1];
-                  setActiveSubtitleIndex(activeSubtitleIndex + 1);
-                  speakCurrentSubtitle(nextSub);
-                  onRecordProgress(scene.id, nextSub.id);
-                  return nextSub.startTime;
-                } else {
-                  setIsPlaying(false);
-                  return activeSubtitle.endTime;
-                }
-              } else if (repeatMode === 'group') {
-                const nextIdx = (activeSubtitleIndex + 1) % scene.subtitles.length;
-                const nextSub = scene.subtitles[nextIdx];
-                setActiveSubtitleIndex(nextIdx);
-                speakCurrentSubtitle(nextSub);
-                onRecordProgress(scene.id, nextSub.id);
-                return nextSub.startTime;
-              }
-            }
-          }
-
-          // Check if index needs updating based on time
-          const detectedIdx = findActiveSubtitleIndex(scene.subtitles, next);
-          if (detectedIdx !== activeSubtitleIndex && detectedIdx >= 0) {
-            setActiveSubtitleIndex(detectedIdx);
-            speakCurrentSubtitle(scene.subtitles[detectedIdx]);
-            onRecordProgress(scene.id, scene.subtitles[detectedIdx].id);
-          }
-
-          return next;
-        });
-      }
-
-      animId = requestAnimationFrame(tick);
+    let animationFrame = 0;
+    const syncPlayback = () => {
+      const video = videoRef.current;
+      if (!video || video.paused || video.ended) return;
+      animationFrame = requestAnimationFrame(syncPlayback);
     };
+    animationFrame = requestAnimationFrame(syncPlayback);
 
-    animId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
-  }, [
-    isPlaying,
-    activeSubtitle,
-    activeSubtitleIndex,
-    repeatMode,
-    settings.playbackSpeed,
-    scene.subtitles,
-    scene.id,
-    videoError,
-    speakCurrentSubtitle,
-    onRecordProgress,
-  ]);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isPlaying, videoError]);
 
   // Cycle playback speed
   const handleCycleSpeed = useCallback(() => {
@@ -327,9 +266,6 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     const newIdx = findActiveSubtitleIndex(scene.subtitles, time);
     if (newIdx !== activeSubtitleIndex && newIdx >= 0) {
       setActiveSubtitleIndex(newIdx);
-      if (scene.subtitles[newIdx]) {
-        onRecordProgress(scene.id, scene.subtitles[newIdx].id);
-      }
     }
   };
 
@@ -457,8 +393,9 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
               }
             }}
             onError={() => {
-              console.warn('Video failed to load from remote, using animated scene preview');
+              console.warn('Video failed to load; playback is unavailable for this scene.');
               setVideoError(true);
+              setIsPlaying(false);
             }}
             onClick={togglePlay}
             className="w-full h-full object-cover cursor-pointer"
