@@ -11,8 +11,9 @@ export const DEMO_SCENES: Scene[] = [
     progressPercent: 45,
     thumbnailUrl:
       'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
-    videoUrl:
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    // Intentionally unset: the previous stock video did not match these subtitles.
+    // Configure an authorized, correctly synchronized clip before enabling playback.
+    videoUrl: '',
     description:
       'Un dialogue touchant entre deux proches sur les doutes, le courage et la confiance en soi.',
     subtitles: [
