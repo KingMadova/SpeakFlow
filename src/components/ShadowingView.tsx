@@ -177,33 +177,6 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     });
   }, [isPlaying, scene.videoUrl, videoError]);
 
-  // Clock loop when isPlaying is true (coordinates time, word highlighting, repeat & advance)
-  // The media element is the single source of truth for playback time.
-  // If the video cannot play, do not simulate progress with a fallback clock.
-  useEffect(() => {
-    if (!isPlaying) {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      return;
-    }
-
-    if (!videoRef.current || videoError) {
-      setIsPlaying(false);
-      return;
-    }
-
-    let animationFrame = 0;
-    const syncPlayback = () => {
-      const video = videoRef.current;
-      if (!video || video.paused || video.ended) return;
-      animationFrame = requestAnimationFrame(syncPlayback);
-    };
-    animationFrame = requestAnimationFrame(syncPlayback);
-
-    return () => cancelAnimationFrame(animationFrame);
-  }, [isPlaying, videoError]);
-
   // Cycle playback speed
   const handleCycleSpeed = useCallback(() => {
     const speeds = [0.75, 1, 1.25, 1.5];
@@ -226,9 +199,16 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     setCurrentTime(time);
 
     // Check repeat mode at end of phrase
-    if (repeatMode === 'phrase' && activeSubtitle) {
-      if (time >= activeSubtitle.endTime) {
-        videoRef.current.currentTime = activeSubtitle.startTime;
+    if (repeatMode === 'phrase' && activeSubtitle && time >= activeSubtitle.endTime) {
+      videoRef.current.currentTime = activeSubtitle.startTime;
+      return;
+    }
+
+    if (repeatMode === 'group') {
+      const firstSubtitle = scene.subtitles[0];
+      const lastSubtitle = scene.subtitles[scene.subtitles.length - 1];
+      if (firstSubtitle && lastSubtitle && time >= lastSubtitle.endTime) {
+        videoRef.current.currentTime = firstSubtitle.startTime;
         return;
       }
     }
