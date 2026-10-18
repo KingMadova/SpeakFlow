@@ -47,7 +47,6 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   onUpdateSettings,
   onBack,
   onOpenRecording,
-  onRecordProgress,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const subtitleListRef = useRef<HTMLDivElement | null>(null);
