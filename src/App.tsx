@@ -77,13 +77,9 @@ export default function App() {
   // Track phrase completion or practice in shadowing
   // Count a phrase only once when the user explicitly records practice,
   // not whenever playback crosses a subtitle or the user navigates.
-  const handleRecordProgress = (_sceneId: string, phraseId: string) => {
-    handleUpdateProgress((prev) => {
-      const practiced = prev.favoritePhraseIds || [];
-      // Keep practice tracking separate from favorites. The count is updated
-      // only from the recording completion callback below.
-      return prev;
-    });
+  const handleRecordProgress = (_sceneId: string, _phraseId: string) => {
+    // Playback/navigation is not proof of practice. Progress is recorded only
+    // after an actual recording is successfully produced.
   };
 
   // Toggle favorite phrase
