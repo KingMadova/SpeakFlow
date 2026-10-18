@@ -1,7 +1,8 @@
 import type { UserProgress, UserSettings } from '../types/index.ts';
 
 const SETTINGS_KEY = 'speakflow_settings_v1';
-const PROGRESS_KEY = 'speakflow_progress_v1';
+const PROGRESS_KEY = 'speakflow_progress_v2';
+const LEGACY_PROGRESS_KEY = 'speakflow_progress_v1';
 const ONBOARDING_KEY = 'speakflow_has_seen_onboarding_v1';
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -92,6 +93,7 @@ export function clearAllLocalData(): void {
   try {
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(LEGACY_PROGRESS_KEY);
     localStorage.removeItem(ONBOARDING_KEY);
   } catch {}
 }
