@@ -1,0 +1,6 @@
+{
+  "name": "SpeakFlow",
+  "description": "Application PWA de shadowing pour apprendre l'anglais avec vidéo synchronisée, sous-titres bilingues, surlignage mot par mot et enregistrement vocal.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
