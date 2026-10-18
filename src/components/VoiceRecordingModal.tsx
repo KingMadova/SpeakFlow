@@ -42,6 +42,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   const [isPlayingRecorded, setIsPlayingRecorded] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const countedBlobRef = useRef<Blob | null>(null);
 
   // Automatically start recording when modal opens if not already recorded
   useEffect(() => {
@@ -61,10 +62,18 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   // A recording counts only after MediaRecorder has produced real audio data.
   // The recorder's onstop event is asynchronous, so the UI waits for audioBlob.
   useEffect(() => {
-    if (audioBlob && audioBlob.size > 0 && !isRecording) {
+    if (!audioBlob) {
+      countedBlobRef.current = null;
+      return;
+    }
+
+    if (audioBlob.size > 0 && !isRecording) {
       setHasRecorded(true);
-      onSaveProgress?.();
-    } else if (audioBlob && audioBlob.size === 0 && !isRecording) {
+      if (countedBlobRef.current !== audioBlob) {
+        countedBlobRef.current = audioBlob;
+        onSaveProgress?.();
+      }
+    } else if (audioBlob.size === 0 && !isRecording) {
       setHasRecorded(false);
     }
   }, [audioBlob, isRecording, onSaveProgress]);
