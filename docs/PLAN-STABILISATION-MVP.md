@@ -16,8 +16,8 @@ Fiabiliser le lecteur d'anglais, les sous-titres, l'enregistrement vocal, les st
 ### Étape 1 — Données honnêtes et suivi
 - [x] Créer une branche de travail isolée.
 - [x] Ajouter ce document de suivi.
-- [ ] Retirer les statistiques et favoris préremplis présentés comme ceux d'un vrai utilisateur.
-- [ ] Empêcher la navigation automatique entre sous-titres de gonfler la progression.
+- [x] Retirer les statistiques et favoris préremplis présentés comme ceux d'un vrai utilisateur.
+- [x] Empêcher la navigation automatique entre sous-titres de gonfler la progression.
 - [ ] Ajouter/valider les commandes de test.
 
 ### Étape 2 — Lecteur et synchronisation
