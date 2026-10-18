@@ -92,40 +92,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     }
   }, [settings.defaultVolume]);
 
-  // English Speech Synthesis Pronunciation Engine
-  const speakCurrentSubtitle = useCallback(
-    (sub: SubtitleItem | null) => {
-      if (!sub || typeof window === 'undefined' || !window.speechSynthesis) return;
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(sub.englishText);
-        utterance.lang = 'en-US';
-        utterance.rate = Math.max(0.6, Math.min(2.0, settings.playbackSpeed));
-        utterance.volume = isMuted ? 0 : settings.defaultVolume / 100;
-
-        const voices = window.speechSynthesis.getVoices();
-        const enVoice =
-          voices.find(
-            (v) =>
-              v.lang.startsWith('en') &&
-              (v.name.includes('Natural') ||
-                v.name.includes('Google') ||
-                v.name.includes('US') ||
-                v.name.includes('Samantha') ||
-                v.name.includes('en_US'))
-          ) || voices.find((v) => v.lang.startsWith('en'));
-
-        if (enVoice) {
-          utterance.voice = enVoice;
-        }
-
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn('Speech synthesis playback error', e);
-      }
-    },
-    [settings.playbackSpeed, settings.defaultVolume, isMuted]
-  );
+  // Original scene audio is the only automatic playback source.
+  // Pronunciation assistance can be added as an explicit, separately labeled action.
 
   // Jump to specific time
   const seekTo = useCallback(
@@ -148,14 +116,12 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       if (!target) return;
       setActiveSubtitleIndex(index);
       seekTo(target.startTime + 0.05);
-      onRecordProgress(scene.id, target.id);
       setIsPlaying(true);
       if (videoRef.current) {
         videoRef.current.play().catch(() => {});
       }
-      speakCurrentSubtitle(target);
     },
-    [scene.subtitles, scene.id, seekTo, onRecordProgress, speakCurrentSubtitle]
+    [scene.subtitles, seekTo]
   );
 
   // Next / Previous phrase navigation
@@ -181,9 +147,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       if (videoRef.current && videoRef.current.paused) {
         videoRef.current.play().catch(() => {});
       }
-      speakCurrentSubtitle(activeSubtitle);
     }
-  }, [activeSubtitle, seekTo, speakCurrentSubtitle]);
+  }, [activeSubtitle, seekTo]);
 
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
@@ -202,9 +167,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
           // If video cannot play, our fallback clock and speech engine runs seamlessly
         });
       }
-      speakCurrentSubtitle(activeSubtitle);
     }
-  }, [isPlaying, activeSubtitle, speakCurrentSubtitle]);
+  }, [isPlaying, activeSubtitle]);
 
   // Clock loop when isPlaying is true (coordinates time, word highlighting, repeat & advance)
   // The media element is the single source of truth for playback time.
