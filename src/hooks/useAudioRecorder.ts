@@ -43,17 +43,26 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   }, []);
 
   const clearRecording = useCallback(() => {
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-    }
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingDuration(0);
     setError(null);
   }, [audioUrl]);
 
+  // Release the currently displayed recording URL when it is replaced or the
+  // component unmounts, so repeated attempts do not leak browser memory.
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
   const cancelRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      // Cancellation discards this take; it must not later be published by onstop.
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
       try {
         mediaRecorderRef.current.stop();
       } catch {}
@@ -170,9 +179,18 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       recorder.onstop = () => {
         const mimeType = recorder.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: mimeType });
+        chunksRef.current = [];
+
+        if (blob.size === 0) {
+          setAudioBlob(null);
+          setError("Aucun son n'a été enregistré. Vérifiez le microphone puis recommencez.");
+          setIsRecording(false);
+          return;
+        }
+
         setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
+        setAudioUrl(URL.createObjectURL(blob));
+        setIsRecording(false);
       };
 
       mediaRecorderRef.current = recorder;

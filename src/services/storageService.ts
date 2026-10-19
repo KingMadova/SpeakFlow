@@ -1,7 +1,8 @@
 import type { UserProgress, UserSettings } from '../types/index.ts';
 
 const SETTINGS_KEY = 'speakflow_settings_v1';
-const PROGRESS_KEY = 'speakflow_progress_v1';
+const PROGRESS_KEY = 'speakflow_progress_v2';
+const LEGACY_PROGRESS_KEY = 'speakflow_progress_v1';
 const ONBOARDING_KEY = 'speakflow_has_seen_onboarding_v1';
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -16,40 +17,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
 };
 
 export const DEFAULT_PROGRESS: UserProgress = {
-  completedScenesCount: 12,
-  practiceTimeMinutes: 48,
-  workedPhrasesCount: 15,
-  difficultPhraseIds: ['ec-1', 'ec-2', 'ec-5'],
-  favoritePhraseIds: ['ec-3', 'ec-7'],
-  recentSessions: [
-    {
-      sceneId: 'everyday-conversation',
-      sceneTitle: 'Everyday Conversation',
-      dateLabel: "Aujourd'hui",
-      durationLabel: '12 min',
-      progressPercent: 45,
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
-    },
-    {
-      sceneId: 'at-the-cafe',
-      sceneTitle: 'At the Café',
-      dateLabel: 'Hier',
-      durationLabel: '8 min',
-      progressPercent: 20,
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=80',
-    },
-    {
-      sceneId: 'job-interview',
-      sceneTitle: 'Job Interview',
-      dateLabel: '12 avr. 2025',
-      durationLabel: '10 min',
-      progressPercent: 0,
-      thumbnailUrl:
-        'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
-    },
-  ],
+  // Start with honest, empty progress. Never present sample activity as user data.
+  completedScenesCount: 0,
+  practiceTimeMinutes: 0,
+  workedPhrasesCount: 0,
+  difficultPhraseIds: [],
+  favoritePhraseIds: [],
+  recentSessions: [],
 };
 
 export function loadSettings(): UserSettings {
@@ -73,14 +47,20 @@ export function saveSettings(settings: UserSettings): void {
 export function loadProgress(): UserProgress {
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
-    if (!raw) return DEFAULT_PROGRESS;
+    if (!raw) return { ...DEFAULT_PROGRESS };
     const parsed = JSON.parse(raw);
     return {
       ...DEFAULT_PROGRESS,
       ...parsed,
       favoritePhraseIds: Array.isArray(parsed.favoritePhraseIds)
         ? parsed.favoritePhraseIds
-        : DEFAULT_PROGRESS.favoritePhraseIds,
+        : [],
+      difficultPhraseIds: Array.isArray(parsed.difficultPhraseIds)
+        ? parsed.difficultPhraseIds
+        : [],
+      recentSessions: Array.isArray(parsed.recentSessions)
+        ? parsed.recentSessions
+        : [],
     };
   } catch {
     return DEFAULT_PROGRESS;
@@ -113,6 +93,7 @@ export function clearAllLocalData(): void {
   try {
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(LEGACY_PROGRESS_KEY);
     localStorage.removeItem(ONBOARDING_KEY);
   } catch {}
 }

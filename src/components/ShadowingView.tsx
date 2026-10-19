@@ -47,7 +47,6 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   onUpdateSettings,
   onBack,
   onOpenRecording,
-  onRecordProgress,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const subtitleListRef = useRef<HTMLDivElement | null>(null);
@@ -78,6 +77,11 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   const activeSubtitle = scene.subtitles[activeSubtitleIndex] || scene.subtitles[0] || null;
   const activeWord = findActiveWord(activeSubtitle, currentTime);
 
+  useEffect(() => {
+    setVideoError(!scene.videoUrl);
+    setIsPlaying(false);
+  }, [scene.id, scene.videoUrl]);
+
   // Synchronize playback speed
   useEffect(() => {
     if (videoRef.current) {
@@ -92,40 +96,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     }
   }, [settings.defaultVolume]);
 
-  // English Speech Synthesis Pronunciation Engine
-  const speakCurrentSubtitle = useCallback(
-    (sub: SubtitleItem | null) => {
-      if (!sub || typeof window === 'undefined' || !window.speechSynthesis) return;
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(sub.englishText);
-        utterance.lang = 'en-US';
-        utterance.rate = Math.max(0.6, Math.min(2.0, settings.playbackSpeed));
-        utterance.volume = isMuted ? 0 : settings.defaultVolume / 100;
-
-        const voices = window.speechSynthesis.getVoices();
-        const enVoice =
-          voices.find(
-            (v) =>
-              v.lang.startsWith('en') &&
-              (v.name.includes('Natural') ||
-                v.name.includes('Google') ||
-                v.name.includes('US') ||
-                v.name.includes('Samantha') ||
-                v.name.includes('en_US'))
-          ) || voices.find((v) => v.lang.startsWith('en'));
-
-        if (enVoice) {
-          utterance.voice = enVoice;
-        }
-
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn('Speech synthesis playback error', e);
-      }
-    },
-    [settings.playbackSpeed, settings.defaultVolume, isMuted]
-  );
+  // Original scene audio is the only automatic playback source.
+  // Pronunciation assistance can be added as an explicit, separately labeled action.
 
   // Jump to specific time
   const seekTo = useCallback(
@@ -148,14 +120,12 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       if (!target) return;
       setActiveSubtitleIndex(index);
       seekTo(target.startTime + 0.05);
-      onRecordProgress(scene.id, target.id);
       setIsPlaying(true);
       if (videoRef.current) {
         videoRef.current.play().catch(() => {});
       }
-      speakCurrentSubtitle(target);
     },
-    [scene.subtitles, scene.id, seekTo, onRecordProgress, speakCurrentSubtitle]
+    [scene.subtitles, seekTo]
   );
 
   // Next / Previous phrase navigation
@@ -181,118 +151,30 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       if (videoRef.current && videoRef.current.paused) {
         videoRef.current.play().catch(() => {});
       }
-      speakCurrentSubtitle(activeSubtitle);
     }
-  }, [activeSubtitle, seekTo, speakCurrentSubtitle]);
+  }, [activeSubtitle, seekTo]);
 
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      if (videoRef.current && !videoRef.current.paused) {
-        videoRef.current.pause();
-      }
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      videoRef.current?.pause();
       setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
-      if (videoRef.current) {
-        videoRef.current.play().catch(() => {
-          // If video cannot play, our fallback clock and speech engine runs seamlessly
-        });
-      }
-      speakCurrentSubtitle(activeSubtitle);
-    }
-  }, [isPlaying, activeSubtitle, speakCurrentSubtitle]);
-
-  // Clock loop when isPlaying is true (coordinates time, word highlighting, repeat & advance)
-  useEffect(() => {
-    if (!isPlaying) {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
       return;
     }
 
-    let lastTime = performance.now();
-    let animId: number;
+    if (!scene.videoUrl || videoError || !videoRef.current) {
+      setVideoError(true);
+      setIsPlaying(false);
+      return;
+    }
 
-    const tick = (now: number) => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // Check if video element is actively playing and advancing
-      const videoAdvancing =
-        videoRef.current &&
-        !videoRef.current.paused &&
-        !videoRef.current.ended &&
-        !videoError;
-
-      if (!videoAdvancing) {
-        setCurrentTime((prev) => {
-          const next = prev + dt * settings.playbackSpeed;
-
-          // Check if current phrase has finished
-          if (activeSubtitle) {
-            if (next >= activeSubtitle.endTime) {
-              if (repeatMode === 'phrase') {
-                speakCurrentSubtitle(activeSubtitle);
-                return activeSubtitle.startTime;
-              } else if (repeatMode === 'off') {
-                if (activeSubtitleIndex < scene.subtitles.length - 1) {
-                  const nextSub = scene.subtitles[activeSubtitleIndex + 1];
-                  setActiveSubtitleIndex(activeSubtitleIndex + 1);
-                  speakCurrentSubtitle(nextSub);
-                  onRecordProgress(scene.id, nextSub.id);
-                  return nextSub.startTime;
-                } else {
-                  setIsPlaying(false);
-                  return activeSubtitle.endTime;
-                }
-              } else if (repeatMode === 'group') {
-                const nextIdx = (activeSubtitleIndex + 1) % scene.subtitles.length;
-                const nextSub = scene.subtitles[nextIdx];
-                setActiveSubtitleIndex(nextIdx);
-                speakCurrentSubtitle(nextSub);
-                onRecordProgress(scene.id, nextSub.id);
-                return nextSub.startTime;
-              }
-            }
-          }
-
-          // Check if index needs updating based on time
-          const detectedIdx = findActiveSubtitleIndex(scene.subtitles, next);
-          if (detectedIdx !== activeSubtitleIndex && detectedIdx >= 0) {
-            setActiveSubtitleIndex(detectedIdx);
-            speakCurrentSubtitle(scene.subtitles[detectedIdx]);
-            onRecordProgress(scene.id, scene.subtitles[detectedIdx].id);
-          }
-
-          return next;
-        });
-      }
-
-      animId = requestAnimationFrame(tick);
-    };
-
-    animId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
-  }, [
-    isPlaying,
-    activeSubtitle,
-    activeSubtitleIndex,
-    repeatMode,
-    settings.playbackSpeed,
-    scene.subtitles,
-    scene.id,
-    videoError,
-    speakCurrentSubtitle,
-    onRecordProgress,
-  ]);
+    videoRef.current.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      setVideoError(true);
+      setIsPlaying(false);
+    });
+  }, [isPlaying, scene.videoUrl, videoError]);
 
   // Cycle playback speed
   const handleCycleSpeed = useCallback(() => {
@@ -316,9 +198,16 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     setCurrentTime(time);
 
     // Check repeat mode at end of phrase
-    if (repeatMode === 'phrase' && activeSubtitle) {
-      if (time >= activeSubtitle.endTime) {
-        videoRef.current.currentTime = activeSubtitle.startTime;
+    if (repeatMode === 'phrase' && activeSubtitle && time >= activeSubtitle.endTime) {
+      videoRef.current.currentTime = activeSubtitle.startTime;
+      return;
+    }
+
+    if (repeatMode === 'group') {
+      const firstSubtitle = scene.subtitles[0];
+      const lastSubtitle = scene.subtitles[scene.subtitles.length - 1];
+      if (firstSubtitle && lastSubtitle && time >= lastSubtitle.endTime) {
+        videoRef.current.currentTime = firstSubtitle.startTime;
         return;
       }
     }
@@ -327,9 +216,6 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     const newIdx = findActiveSubtitleIndex(scene.subtitles, time);
     if (newIdx !== activeSubtitleIndex && newIdx >= 0) {
       setActiveSubtitleIndex(newIdx);
-      if (scene.subtitles[newIdx]) {
-        onRecordProgress(scene.id, scene.subtitles[newIdx].id);
-      }
     }
   };
 
@@ -457,8 +343,9 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
               }
             }}
             onError={() => {
-              console.warn('Video failed to load from remote, using animated scene preview');
+              console.warn('Video failed to load; playback is unavailable for this scene.');
               setVideoError(true);
+              setIsPlaying(false);
             }}
             onClick={togglePlay}
             className="w-full h-full object-cover cursor-pointer"
@@ -467,8 +354,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
           {/* Interactive animated fallback if video network is restricted */}
           {videoError && (
             <div
-              onClick={togglePlay}
-              className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-4 text-center cursor-pointer"
+              className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-4 text-center"
             >
               <img
                 src={scene.thumbnailUrl}
@@ -477,17 +363,17 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
               />
               <div className="relative z-10 bg-black/60 backdrop-blur-sm p-3 rounded-xl border border-white/10 max-w-xs">
                 <p className="text-xs font-semibold text-[#FF7A18] mb-1">
-                  Scène d&apos;écoute & shadowing
+                  Vidéo indisponible
                 </p>
                 <p className="text-[11px] text-[#C5C5CE]">
-                  Cliquez pour {isPlaying ? 'mettre en pause' : 'lancer la scène'}
+                  Cette scène ne peut pas être synchronisée tant qu’une vidéo adaptée n’est pas configurée.
                 </p>
               </div>
             </div>
           )}
 
           {/* Play/Pause overlay icon when paused */}
-          {!isPlaying && (
+          {!isPlaying && !videoError && (
             <button
               onClick={togglePlay}
               className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"

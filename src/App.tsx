@@ -75,11 +75,11 @@ export default function App() {
   };
 
   // Track phrase completion or practice in shadowing
-  const handleRecordProgress = (sceneId: string, phraseId: string) => {
-    handleUpdateProgress((prev) => ({
-      ...prev,
-      workedPhrasesCount: prev.workedPhrasesCount + 1,
-    }));
+  // Count a phrase only once when the user explicitly records practice,
+  // not whenever playback crosses a subtitle or the user navigates.
+  const handleRecordProgress = (_sceneId: string, _phraseId: string) => {
+    // Playback/navigation is not proof of practice. Progress is recorded only
+    // after an actual recording is successfully produced.
   };
 
   // Toggle favorite phrase
@@ -134,7 +134,6 @@ export default function App() {
     handleUpdateProgress((prev) => ({
       ...prev,
       workedPhrasesCount: prev.workedPhrasesCount + 1,
-      practiceTimeMinutes: prev.practiceTimeMinutes + 1,
     }));
   };
 
@@ -142,7 +141,7 @@ export default function App() {
   const handleClearData = () => {
     clearAllLocalData();
     setSettings(DEFAULT_SETTINGS);
-    setProgress(DEFAULT_PROGRESS);
+    setProgress({ ...DEFAULT_PROGRESS });
     alert('Toutes les données locales ont été réinitialisées.');
   };
 
