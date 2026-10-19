@@ -120,17 +120,17 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   }, [scene.id]);
 
-  const speakActivePhrase = useCallback(() => {
-    if (!speechSupported || !activeSubtitle) return;
+  const speakActivePhrase = useCallback((phrase: SubtitleItem | null = activeSubtitle) => {
+    if (!speechSupported || !phrase) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(activeSubtitle.englishText);
+    const utterance = new SpeechSynthesisUtterance(phrase.englishText);
     utterance.lang = 'en-US';
     utterance.rate = settings.playbackSpeed;
     utterance.onstart = () => { setIsSpeakingPhrase(true); setIsPlaying(true); };
     utterance.onend = () => {
       setIsSpeakingPhrase(false);
       setIsPlaying(false);
-      setCurrentTime(activeSubtitle.endTime);
+      setCurrentTime(phrase.endTime);
       if (repeatMode === 'phrase') {
         // Phrase repeat is explicit: speak again only while the user keeps playback active.
         setIsPlaying(false);
@@ -169,7 +169,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       // Text navigation remains available even when this scene has no video.
       // Never show a playing state unless the media element actually starts.
       if (!scene.videoUrl) {
-        speakActivePhrase();
+        speakActivePhrase(target);
         return;
       }
       if (videoError || !videoRef.current) { setIsPlaying(false); return; }
