@@ -25,20 +25,20 @@ Fiabiliser le lecteur d'anglais, les sous-titres, l'enregistrement vocal, les st
 - [ ] Désactiver l'horloge de secours qui simule une lecture quand la vidéo ne joue pas.
 - [ ] Ne pas superposer automatiquement la synthèse vocale à l'audio de la vidéo.
 - [ ] Vérifier les modes répétition phrase/groupe/aucune répétition.
-- [ ] Utiliser une vidéo autorisée et réellement alignée sur les sous-titres, ou afficher un état explicite « média de démonstration indisponible ».
+- [x] Retirer toutes les vidéos génériques non vérifiées et afficher un état explicite « vidéo indisponible » tant qu'un média synchronisé n'est pas configuré.
 
 ### Étape 3 — Enregistrement vocal
-- [ ] Démarrer l'enregistrement à la demande de l'utilisateur.
+- [x] Démarrer l'enregistrement à la demande de l'utilisateur.
 - [ ] Construire le fichier uniquement depuis les événements réels de MediaRecorder.
 - [ ] Afficher les erreurs de microphone et proposer de recommencer.
-- [ ] Libérer correctement les pistes, AudioContext et URL d'objet.
+- [x] Libérer correctement les pistes, AudioContext et URL d'objet.
 - [ ] Ne jamais générer un faux enregistrement en cas d'échec.
 
 ### Étape 4 — Tests et PWA
-- [ ] Ajouter un script de test reproductible.
-- [ ] Exécuter build, tests et vérification TypeScript dans l'environnement du projet.
-- [ ] Vérifier l'installation PWA sur téléphone et ordinateur.
+- [x] Ajouter/valider une commande de test reproductible.
+- [x] Exécuter build, tests et vérification TypeScript via GitHub Actions.
+- [ ] Vérifier l'installation PWA sur téléphone et ordinateur manuellement.
 - [ ] Documenter les limites hors ligne, en particulier pour les vidéos distantes.
 
 ## État
-Audit statique effectué le 18 octobre 2026. Les validations runtime restent à effectuer tant qu'un build et les tests n'ont pas été exécutés dans l'environnement du projet.
+Le 19 octobre 2026, GitHub Actions a validé TypeScript, les 7 tests unitaires, le build de production et un smoke test Chromium (1 réussi). Le lecteur réinitialise désormais son état au changement de scène et ne simule pas la lecture lorsque la vidéo manque. Les tests manuels du microphone, de l'installation PWA et de l'affichage mobile restent à effectuer.
