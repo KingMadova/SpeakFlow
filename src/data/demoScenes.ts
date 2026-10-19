@@ -8,7 +8,7 @@ export const DEMO_SCENES: Scene[] = [
     level: 'Débutant',
     durationMinutes: 3,
     category: 'Conversation',
-    progressPercent: 45,
+    progressPercent: 0,
     thumbnailUrl:
       'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
     // Intentionally unset: the previous stock video did not match these subtitles.
@@ -234,11 +234,11 @@ export const DEMO_SCENES: Scene[] = [
     level: 'Débutant',
     durationMinutes: 4,
     category: 'Vie quotidienne',
-    progressPercent: 20,
+    progressPercent: 0,
     thumbnailUrl:
       'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=80',
-    videoUrl:
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    // No verified, subtitle-aligned clip is configured for this sample scene.
+    videoUrl: '',
     description:
       'Apprenez à commander votre boisson, demander une formule et régler la note dans un café anglophone.',
     subtitles: [
@@ -304,8 +304,8 @@ export const DEMO_SCENES: Scene[] = [
     progressPercent: 0,
     thumbnailUrl:
       'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
-    videoUrl:
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    // No verified, subtitle-aligned clip is configured for this sample scene.
+    videoUrl: '',
     description:
       'Présentez vos forces, vos réalisations passées et répondez avec assurance aux questions du recruteur.',
     subtitles: [
@@ -423,8 +423,8 @@ export const DEMO_SCENES: Scene[] = [
     progressPercent: 0,
     thumbnailUrl:
       'https://images.unsplash.com/photo-1530521954074-e64f6810b32d?auto=format&fit=crop&w=600&q=80',
-    videoUrl:
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    // No verified, subtitle-aligned clip is configured for this sample scene.
+    videoUrl: '',
     description:
       'Naviguez dans le terminal, enregistrez vos bagages et trouvez votre porte d’embarquement en anglais.',
     subtitles: [
