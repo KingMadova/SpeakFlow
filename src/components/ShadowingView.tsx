@@ -78,9 +78,25 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   const activeWord = findActiveWord(activeSubtitle, currentTime);
 
   useEffect(() => {
+    const nextIndex = initialSubtitleId
+      ? Math.max(0, scene.subtitles.findIndex((subtitle) => subtitle.id === initialSubtitleId))
+      : 0;
+    const nextSubtitle = scene.subtitles[nextIndex];
+    const nextTime = initialSubtitleId && nextSubtitle ? nextSubtitle.startTime : 0;
+
     setVideoError(!scene.videoUrl);
     setIsPlaying(false);
-  }, [scene.id, scene.videoUrl]);
+    setActiveSubtitleIndex(nextIndex);
+    setCurrentTime(nextTime);
+    setDuration(sceneMaxDuration);
+
+    if (videoRef.current) {
+      videoRef.current.pause();
+      try {
+        videoRef.current.currentTime = nextTime;
+      } catch {}
+    }
+  }, [scene.id, scene.videoUrl, scene.subtitles, sceneMaxDuration, initialSubtitleId]);
 
   // Synchronize playback speed
   useEffect(() => {
@@ -120,12 +136,22 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       if (!target) return;
       setActiveSubtitleIndex(index);
       seekTo(target.startTime + 0.05);
-      setIsPlaying(true);
-      if (videoRef.current) {
-        videoRef.current.play().catch(() => {});
+
+      // Text navigation remains available even when this scene has no video.
+      // Never show a playing state unless the media element actually starts.
+      if (!scene.videoUrl || videoError || !videoRef.current) {
+        setIsPlaying(false);
+        return;
       }
+
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        setVideoError(true);
+        setIsPlaying(false);
+      });
     },
-    [scene.subtitles, seekTo]
+    [scene.subtitles, scene.videoUrl, videoError, seekTo]
   );
 
   // Next / Previous phrase navigation
@@ -145,14 +171,21 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
 
   // Repeat current phrase
   const handleRepeatPhrase = useCallback(() => {
-    if (activeSubtitle) {
-      seekTo(activeSubtitle.startTime);
-      setIsPlaying(true);
-      if (videoRef.current && videoRef.current.paused) {
-        videoRef.current.play().catch(() => {});
-      }
+    if (!activeSubtitle) return;
+    seekTo(activeSubtitle.startTime);
+
+    if (!scene.videoUrl || videoError || !videoRef.current) {
+      setIsPlaying(false);
+      return;
     }
-  }, [activeSubtitle, seekTo]);
+
+    videoRef.current.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      setVideoError(true);
+      setIsPlaying(false);
+    });
+  }, [activeSubtitle, scene.videoUrl, videoError, seekTo]);
 
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
@@ -336,6 +369,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
             muted={isMuted}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onEnded={() => setIsPlaying(false)}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
               if (videoRef.current) {
