@@ -73,6 +73,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
   const [showFullList, setShowFullList] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [isSpeakingPhrase, setIsSpeakingPhrase] = useState(false);
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
   const activeSubtitle = scene.subtitles[activeSubtitleIndex] || scene.subtitles[0] || null;
   const activeWord = findActiveWord(activeSubtitle, currentTime);
@@ -112,8 +114,35 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     }
   }, [settings.defaultVolume]);
 
-  // Original scene audio is the only automatic playback source.
-  // Pronunciation assistance can be added as an explicit, separately labeled action.
+  // For lessons without a verified video, offer an explicit browser-generated English voice.
+  // This is phrase-synchronized practice, not a claim of word-level media synchronization.
+  useEffect(() => () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, [scene.id]);
+
+  const speakActivePhrase = useCallback(() => {
+    if (!speechSupported || !activeSubtitle) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(activeSubtitle.englishText);
+    utterance.lang = 'en-US';
+    utterance.rate = settings.playbackSpeed;
+    utterance.onstart = () => { setIsSpeakingPhrase(true); setIsPlaying(true); };
+    utterance.onend = () => {
+      setIsSpeakingPhrase(false);
+      setIsPlaying(false);
+      setCurrentTime(activeSubtitle.endTime);
+      if (repeatMode === 'phrase') {
+        // Phrase repeat is explicit: speak again only while the user keeps playback active.
+        setIsPlaying(false);
+      } else if (repeatMode === 'off' && activeSubtitleIndex < scene.subtitles.length - 1) {
+        const next = activeSubtitleIndex + 1;
+        setActiveSubtitleIndex(next);
+        setCurrentTime(scene.subtitles[next].startTime);
+      }
+    };
+    utterance.onerror = () => { setIsSpeakingPhrase(false); setIsPlaying(false); };
+    window.speechSynthesis.speak(utterance);
+  }, [speechSupported, activeSubtitle, settings.playbackSpeed, repeatMode, activeSubtitleIndex, scene.subtitles]);
 
   // Jump to specific time
   const seekTo = useCallback(
@@ -139,10 +168,11 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
 
       // Text navigation remains available even when this scene has no video.
       // Never show a playing state unless the media element actually starts.
-      if (!scene.videoUrl || videoError || !videoRef.current) {
-        setIsPlaying(false);
+      if (!scene.videoUrl) {
+        speakActivePhrase();
         return;
       }
+      if (videoError || !videoRef.current) { setIsPlaying(false); return; }
 
       videoRef.current.play().then(() => {
         setIsPlaying(true);
@@ -151,7 +181,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
         setIsPlaying(false);
       });
     },
-    [scene.subtitles, scene.videoUrl, videoError, seekTo]
+    [scene.subtitles, scene.videoUrl, videoError, seekTo, speakActivePhrase]
   );
 
   // Next / Previous phrase navigation
@@ -174,10 +204,8 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
     if (!activeSubtitle) return;
     seekTo(activeSubtitle.startTime);
 
-    if (!scene.videoUrl || videoError || !videoRef.current) {
-      setIsPlaying(false);
-      return;
-    }
+    if (!scene.videoUrl) { speakActivePhrase(); return; }
+    if (videoError || !videoRef.current) { setIsPlaying(false); return; }
 
     videoRef.current.play().then(() => {
       setIsPlaying(true);
@@ -185,21 +213,20 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       setVideoError(true);
       setIsPlaying(false);
     });
-  }, [activeSubtitle, scene.videoUrl, videoError, seekTo]);
+  }, [activeSubtitle, scene.videoUrl, videoError, seekTo, speakActivePhrase]);
 
   // Handle Play/Pause
   const togglePlay = useCallback(() => {
     if (isPlaying) {
+      if (isSpeakingPhrase && speechSupported) window.speechSynthesis.cancel();
       videoRef.current?.pause();
+      setIsSpeakingPhrase(false);
       setIsPlaying(false);
       return;
     }
 
-    if (!scene.videoUrl || videoError || !videoRef.current) {
-      setVideoError(true);
-      setIsPlaying(false);
-      return;
-    }
+    if (!scene.videoUrl) { speakActivePhrase(); return; }
+    if (videoError || !videoRef.current) { setIsPlaying(false); return; }
 
     videoRef.current.play().then(() => {
       setIsPlaying(true);
@@ -207,7 +234,7 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
       setVideoError(true);
       setIsPlaying(false);
     });
-  }, [isPlaying, scene.videoUrl, videoError]);
+  }, [isPlaying, isSpeakingPhrase, speechSupported, scene.videoUrl, videoError, speakActivePhrase]);
 
   // Cycle playback speed
   const handleCycleSpeed = useCallback(() => {
@@ -385,8 +412,20 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
             className="w-full h-full object-cover cursor-pointer"
           />
 
-          {/* Interactive animated fallback if video network is restricted */}
-          {videoError && (
+          {/* Verified video when available; otherwise an explicit generated-voice practice mode. */}
+          {!scene.videoUrl && speechSupported && (
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-5 text-center">
+              <img src={scene.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />
+              <div className="relative z-10 bg-black/65 backdrop-blur-sm p-4 rounded-xl border border-white/10 max-w-xs">
+                <p className="text-xs font-semibold text-[#FF7A18] mb-2">Mode entraînement vocal</p>
+                <p className="text-sm text-white mb-3">La phrase anglaise est lue par la voix de votre navigateur. Écoutez, puis enregistrez votre répétition.</p>
+                <button onClick={(event) => { event.stopPropagation(); speakActivePhrase(); }} className="px-4 py-2 rounded-full bg-[#FF7A18] text-white text-sm font-semibold">Écouter la phrase</button>
+                <p className="text-[10px] text-[#C5C5CE] mt-2">Voix synthétique • synchronisation par phrase</p>
+              </div>
+            </div>
+          )}
+
+          {videoError && scene.videoUrl && (
             <div
               className="absolute inset-0 bg-gradient-to-tr from-[#141419] to-[#282030] flex flex-col items-center justify-center p-4 text-center"
             >
@@ -400,14 +439,14 @@ export const ShadowingView: React.FC<ShadowingViewProps> = ({
                   Vidéo indisponible
                 </p>
                 <p className="text-[11px] text-[#C5C5CE]">
-                  Cette scène ne peut pas être synchronisée tant qu’une vidéo adaptée n’est pas configurée.
+                  Cette vidéo ne peut pas être lue. Vous pouvez continuer avec l’entraînement vocal par phrase.
                 </p>
               </div>
             </div>
           )}
 
           {/* Play/Pause overlay icon when paused */}
-          {!isPlaying && !videoError && (
+          {!isPlaying && !!scene.videoUrl && !videoError && (
             <button
               onClick={togglePlay}
               className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
